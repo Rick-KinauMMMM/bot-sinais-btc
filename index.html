@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot de Sinais Bitcoin - CoinGecko</title>
+  <link rel="manifest" href="manifest.json" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker registrado'))
+        .catch((err) => console.log('Erro ao registrar SW:', err));
+    }
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #111;
+      color: #fff;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 18px;
+      margin: 20px;
+      cursor: pointer;
+      background-color: #0f9d58;
+      color: white;
+      border: none;
+      border-radius: 8px;
+    }
+    #output {
+      font-size: 20px;
+      margin-top: 20px;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      h1 { font-size: 24px; }
+      button { width: 90%; font-size: 16px; }
+      #output { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>💎 Bot de Sinais BTC/USDT - CoinGecko</h1>
+  <button onclick="analisarMercado()">Analisar Agora</button>
+  <div id="output">Clique para ver o sinal...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/technicalindicators@3.1.1/dist/browser.js"></script>
+  <script>
+    async function analisarMercado() {
+      const output = document.getElementById("output");
+      output.innerHTML = "Analisando mercado com dados da CoinGecko...";
+
+      try {
+        const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=minute");
+        const data = await res.json();
+
+        const closes = data.prices.map(p => p[1]);
+        const volumes = data.total_volumes.map(v => v[1]);
+
+        const rsi = window.technicalindicators.RSI.calculate({ period: 14, values: closes });
+        const ultimoRSI = rsi[rsi.length - 1];
+
+        const macd = window.technicalindicators.MACD.calculate({
+          values: closes,
+          fastPeriod: 12,
+          slowPeriod: 26,
+          signalPeriod: 9,
+          SimpleMAOscillator: false,
+          SimpleMASignal: false
+        });
+        const ultimoMACD = macd[macd.length - 1];
+
+        const sma50 = window.technicalindicators.SMA.calculate({ period: 50, values: closes });
+        const sma20 = window.technicalindicators.SMA.calculate({ period: 20, values: closes });
+
+        const bb = window.technicalindicators.BollingerBands.calculate({
+          period: 20,
+          values: closes,
+          stdDev: 2
+        });
+        const ultimoBB = bb[bb.length - 1];
+
+        const precoAtual = closes[closes.length - 1];
+
+        let sinaisPositivos = 0;
+        let sinaisNegativos = 0;
+
+        if (ultimoRSI < 30) sinaisPositivos++;
+        if (ultimoRSI > 70) sinaisNegativos++;
+
+        if (ultimoMACD.MACD > ultimoMACD.signal) sinaisPositivos++;
+        if (ultimoMACD.MACD < ultimoMACD.signal) sinaisNegativos++;
+
+        if (precoAtual > sma50[sma50.length - 1]) sinaisPositivos++;
+        else sinaisNegativos++;
+
+        if (precoAtual < ultimoBB.lower) sinaisPositivos++;
+        if (precoAtual > ultimoBB.upper) sinaisNegativos++;
+
+        if (volumes[volumes.length - 1] > volumes.reduce((a,b)=>a+b,0)/volumes.length) sinaisPositivos++;
+
+        if (sinaisPositivos >= 4) {
+          output.innerHTML = "🟢 SINAL: COMPRAR (Base técnica forte)";
+        } else if (sinaisNegativos >= 4) {
+          output.innerHTML = "🔴 SINAL: VENDER (Pressão vendedora identificada)";
+        } else {
+          output.innerHTML = "🟡 SINAL: AGUARDAR (Sem confirmação forte)";
+        }
+      } catch (err) {
+        console.error(err);
+        output.innerHTML = "Erro ao buscar dados. Verifique sua conexão.";
+      }
+    }
+  </script>
+</body>
+</html>
