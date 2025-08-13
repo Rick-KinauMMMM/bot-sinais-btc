@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bot de Sinais BTC</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 2rem; background: #f5f5f5; }
+    button { padding: 1rem 2rem; font-size: 1.2rem; cursor: pointer; }
+    #resultado { margin-top: 2rem; font-size: 1.1rem; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Bot de Sinais BTC - CoinGecko</h1>
+  <button onclick="analisar()">Analisar Agora</button>
+  <div id="resultado">Clique no botão para obter sinais.</div>
+
+  <script>
+    async function fetchComFallback(urls) {
+      for (let url of urls) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Erro: ' + res.status);
+          return await res.json();
+        } catch (e) {
+          console.warn("Erro ao tentar:", url, e.message);
+        }
+      }
+      throw new Error("Todas as tentativas falharam.");
+    }
+
+    async function analisar() {
+      const resultado = document.getElementById("resultado");
+      resultado.innerText = "Analisando...";
+
+      const directUrl = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=minute";
+      const proxyUrl = "https://cors-anywhere.herokuapp.com/" + directUrl;
+
+      try {
+        const data = await fetchComFallback([directUrl, proxyUrl]);
+
+        const prices = data.prices;
+        const volumes = data.total_volumes;
+
+        const ultimos10 = prices.slice(-10).map(p => p[1]);
+        const media = ultimos10.reduce((a, b) => a + b, 0) / ultimos10.length;
+        const atual = prices[prices.length - 1][1];
+
+        let decisao = "Aguardar";
+        if (atual > media * 1.01) decisao = "Sinal de VENDA";
+        else if (atual < media * 0.99) decisao = "Sinal de COMPRA";
+
+        resultado.innerText = `Preço atual: $${atual.toFixed(2)}
+Média 10min: $${media.toFixed(2)}
+➡️ ${decisao}`;
+      } catch (err) {
+        resultado.innerText = "Erro ao buscar dados. Verifique sua conexão ou o bloqueio de CORS.";
+      }
+    }
+  </script>
+</body>
+</html>
